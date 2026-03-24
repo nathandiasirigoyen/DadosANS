@@ -73,7 +73,7 @@ class ContextoExecucao:
     processados: int = 0
 
 
-def baixar_extrair_mesclar_url_v2(
+def baixar_extrair_mesclar(
     url_origem: str,
     *,
     nome_pasta_execucao: Optional[str] = None,
