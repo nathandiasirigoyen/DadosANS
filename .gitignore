@@ -208,5 +208,5 @@ marimo/_lsp/
 __marimo__/
 
 # Arquivos muito grandes
-mescla_ETARIA.csv
-mescla_HOSPITALARES.csv
+mescla*
+dicionario*

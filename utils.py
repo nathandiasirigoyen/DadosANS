@@ -94,6 +94,7 @@ class ContextoExecucao:
 def baixar_extrair_mesclar(
     url_origem: str,
     *,
+    mesclar: bool = True,
     nome_pasta_execucao: Optional[str] = None,
     base_dir_execucao: Optional[Path | str] = None,
     pasta_saida_mesclas: Optional[Path | str] = None,
@@ -193,6 +194,8 @@ def baixar_extrair_mesclar(
 
     Parâmetros
     ----------
+    mesclar: bool, default True
+        Chama a função de mescla quando = True
     url_origem : str
         URL da origem dos dados. Pode ser:
         - URL HTTP/HTTPS/FTP de um arquivo `.zip`
@@ -1222,171 +1225,173 @@ def baixar_extrair_mesclar(
         total_registros: int = manifesto_df.height
         definir_total_arquivos(total_registros, "mesclagem incremental")
 
-        if total_registros == 0:
-            raise ValueError("Nenhum arquivo compatível foi ingerido para processamento.")
+        if mesclar == True:
+        
+            if total_registros == 0:
+                raise ValueError("Nenhum arquivo compatível foi ingerido para processamento.")
 
-        if total_registros == 1:
-            registro_unico = manifesto_df.row(0, named=True)
-            caminho_local: Path = Path(str(registro_unico.get("caminho_local") or ""))
-            nome_arquivo: str = str(registro_unico.get("nome_arquivo") or "")
-            arquivo_origem: str = str(registro_unico.get("arquivo_origem") or "")
-            grupo_padrao_bruto: str = str(registro_unico.get("grupo_mescla_padrao") or "").strip()
-            grupo_padrao: Optional[str] = grupo_padrao_bruto if grupo_padrao_bruto else None
+            if total_registros == 1:
+                registro_unico = manifesto_df.row(0, named=True)
+                caminho_local: Path = Path(str(registro_unico.get("caminho_local") or ""))
+                nome_arquivo: str = str(registro_unico.get("nome_arquivo") or "")
+                arquivo_origem: str = str(registro_unico.get("arquivo_origem") or "")
+                grupo_padrao_bruto: str = str(registro_unico.get("grupo_mescla_padrao") or "").strip()
+                grupo_padrao: Optional[str] = grupo_padrao_bruto if grupo_padrao_bruto else None
 
-            imprimir_log(
-                fase="saída",
-                funcao="mesclar_arquivos_ingeridos",
-                etapa="Mesclagem não executada: apenas um arquivo compatível foi ingerido",
-                caminho=str(caminho_local.parent),
-                arquivo=nome_arquivo,
-                processados=0,
-                total=1,
-                icone="ℹ️",
-            )
-
-            if arquivo_origem not in arquivos_lidos:
-                arquivos_lidos.append(arquivo_origem)
-
-            imprimir_chamados_leitura_polars({})
-            if not retornar_df_unificado:
-                return None
-
-            lotes_unicos: list[pl.DataFrame] = []
-            grupo_mescla_unico: str = obter_grupo_mescla(nome_arquivo, grupo_padrao)
-            for lote in iterar_lotes_tabulados(caminho_local):
-                lote = lote.with_columns(
-                    pl.lit(arquivo_origem).alias("arquivo_origem"),
-                    pl.lit(grupo_mescla_unico).alias("grupo_mescla"),
-                )
-                lotes_unicos.append(lote)
-
-            if not lotes_unicos:
-                return None
-            return pl.concat(lotes_unicos, how="diagonal_relaxed")
-
-        grupos_gerados: set[str] = set()
-        for registro in manifesto_df.iter_rows(named=True):
-            caminho_local: Path = Path(str(registro.get("caminho_local") or ""))
-            nome_arquivo: str = str(registro.get("nome_arquivo") or "")
-            arquivo_origem: str = str(registro.get("arquivo_origem") or "")
-            grupo_padrao_bruto: str = str(registro.get("grupo_mescla_padrao") or "").strip()
-            grupo_padrao: Optional[str] = grupo_padrao_bruto if grupo_padrao_bruto else None
-
-            imprimir_log(
-                fase="mesclagem",
-                funcao="mesclar_arquivos_ingeridos",
-                etapa="Processando arquivo ingerido",
-                caminho=str(caminho_local.parent),
-                arquivo=nome_arquivo,
-                processados=contexto.processados,
-                total=contexto.total_planejado,
-                icone="🧩",
-            )
-
-            if nome_deve_ser_ignorado(nome_arquivo):
-                arquivos_ignorados.append(nome_arquivo)
-                atualizar_progresso_global(
-                    fase="mesclagem",
+                imprimir_log(
+                    fase="saída",
                     funcao="mesclar_arquivos_ingeridos",
-                    etapa="Arquivo ignorado por regra de nome",
+                    etapa="Mesclagem não executada: apenas um arquivo compatível foi ingerido",
                     caminho=str(caminho_local.parent),
                     arquivo=nome_arquivo,
-                    icone="🚫",
+                    processados=0,
+                    total=1,
+                    icone="ℹ️",
                 )
-                continue
 
-            try:
-                grupo_mescla: str = obter_grupo_mescla(nome_arquivo, grupo_padrao)
-                nome_saida: str = f"mescla_{normalizar_nome_arquivo_saida(grupo_mescla)}.csv"
-                caminho_saida: Path = pasta_saida / nome_saida
+                if arquivo_origem not in arquivos_lidos:
+                    arquivos_lidos.append(arquivo_origem)
 
+                imprimir_chamados_leitura_polars({})
+                if not retornar_df_unificado:
+                    return None
+
+                lotes_unicos: list[pl.DataFrame] = []
+                grupo_mescla_unico: str = obter_grupo_mescla(nome_arquivo, grupo_padrao)
                 for lote in iterar_lotes_tabulados(caminho_local):
                     lote = lote.with_columns(
                         pl.lit(arquivo_origem).alias("arquivo_origem"),
-                        pl.lit(grupo_mescla).alias("grupo_mescla"),
+                        pl.lit(grupo_mescla_unico).alias("grupo_mescla"),
                     )
-                    append_df_em_csv(lote, caminho_saida)
+                    lotes_unicos.append(lote)
 
-                grupos_gerados.add(grupo_mescla)
-                arquivos_lidos.append(arquivo_origem)
-                caminhos_mesclas_geradas[grupo_mescla] = caminho_saida
-                atualizar_progresso_global(
+                if not lotes_unicos:
+                    return None
+                return pl.concat(lotes_unicos, how="diagonal_relaxed")
+
+            grupos_gerados: set[str] = set()
+            for registro in manifesto_df.iter_rows(named=True):
+                caminho_local: Path = Path(str(registro.get("caminho_local") or ""))
+                nome_arquivo: str = str(registro.get("nome_arquivo") or "")
+                arquivo_origem: str = str(registro.get("arquivo_origem") or "")
+                grupo_padrao_bruto: str = str(registro.get("grupo_mescla_padrao") or "").strip()
+                grupo_padrao: Optional[str] = grupo_padrao_bruto if grupo_padrao_bruto else None
+
+                imprimir_log(
                     fase="mesclagem",
                     funcao="mesclar_arquivos_ingeridos",
-                    etapa=f"Mesclagem concluída para o grupo {grupo_mescla}",
-                    caminho=str(caminho_saida.parent),
-                    arquivo=nome_saida,
-                    icone="✅",
-                )
-            except Exception as erro:
-                erros.append(
-                    {
-                        "arquivo": arquivo_origem,
-                        "erro": f"Falha na mesclagem incremental: {erro}",
-                    }
-                )
-                atualizar_progresso_global(
-                    fase="mesclagem",
-                    funcao="mesclar_arquivos_ingeridos",
-                    etapa="Erro ao mesclar arquivo",
+                    etapa="Processando arquivo ingerido",
                     caminho=str(caminho_local.parent),
                     arquivo=nome_arquivo,
-                    icone="❌",
+                    processados=contexto.processados,
+                    total=contexto.total_planejado,
+                    icone="🧩",
                 )
 
-        if not arquivos_lidos:
-            raise ValueError("Nenhum arquivo compatível foi encontrado ou lido com sucesso.")
+                if nome_deve_ser_ignorado(nome_arquivo):
+                    arquivos_ignorados.append(nome_arquivo)
+                    atualizar_progresso_global(
+                        fase="mesclagem",
+                        funcao="mesclar_arquivos_ingeridos",
+                        etapa="Arquivo ignorado por regra de nome",
+                        caminho=str(caminho_local.parent),
+                        arquivo=nome_arquivo,
+                        icone="🚫",
+                    )
+                    continue
 
-        imprimir_log(
-            fase="saída",
-            funcao="mesclar_arquivos_ingeridos",
-            etapa="Arquivos CSV por grupo gerados com sucesso",
-            caminho=str(pasta_saida),
-            arquivo=f"{len(grupos_gerados)} grupo(s)",
-            processados=len(grupos_gerados),
-            total=len(grupos_gerados),
-            icone="💾",
-        )
+                try:
+                    grupo_mescla: str = obter_grupo_mescla(nome_arquivo, grupo_padrao)
+                    nome_saida: str = f"mescla_{normalizar_nome_arquivo_saida(grupo_mescla)}.csv"
+                    caminho_saida: Path = pasta_saida / nome_saida
 
-        imprimir_chamados_leitura_polars(caminhos_mesclas_geradas)
-        if not retornar_df_unificado:
-            return None
+                    for lote in iterar_lotes_tabulados(caminho_local):
+                        lote = lote.with_columns(
+                            pl.lit(arquivo_origem).alias("arquivo_origem"),
+                            pl.lit(grupo_mescla).alias("grupo_mescla"),
+                        )
+                        append_df_em_csv(lote, caminho_saida)
 
-        imprimir_log(
-            fase="saída",
-            funcao="mesclar_arquivos_ingeridos",
-            etapa="Montando df_unificado a partir dos CSVs por grupo",
-            caminho=str(pasta_saida),
-            arquivo="df_unificado",
-            processados=0,
-            total=len(grupos_gerados),
-            icone="📚",
-        )
+                    grupos_gerados.add(grupo_mescla)
+                    arquivos_lidos.append(arquivo_origem)
+                    caminhos_mesclas_geradas[grupo_mescla] = caminho_saida
+                    atualizar_progresso_global(
+                        fase="mesclagem",
+                        funcao="mesclar_arquivos_ingeridos",
+                        etapa=f"Mesclagem concluída para o grupo {grupo_mescla}",
+                        caminho=str(caminho_saida.parent),
+                        arquivo=nome_saida,
+                        icone="✅",
+                    )
+                except Exception as erro:
+                    erros.append(
+                        {
+                            "arquivo": arquivo_origem,
+                            "erro": f"Falha na mesclagem incremental: {erro}",
+                        }
+                    )
+                    atualizar_progresso_global(
+                        fase="mesclagem",
+                        funcao="mesclar_arquivos_ingeridos",
+                        etapa="Erro ao mesclar arquivo",
+                        caminho=str(caminho_local.parent),
+                        arquivo=nome_arquivo,
+                        icone="❌",
+                    )
 
-        dfs_finais: list[pl.DataFrame] = []
-        grupos_processados: int = 0
-        for grupo in sorted(grupos_gerados):
-            caminho_grupo: Path = pasta_saida / f"mescla_{normalizar_nome_arquivo_saida(grupo)}.csv"
-            if not caminho_grupo.exists():
-                continue
+            if not arquivos_lidos:
+                raise ValueError("Nenhum arquivo compatível foi encontrado ou lido com sucesso.")
 
-            df_grupo: pl.DataFrame = pl.read_csv(caminho_grupo)
-            dfs_finais.append(df_grupo)
-            grupos_processados += 1
             imprimir_log(
                 fase="saída",
                 funcao="mesclar_arquivos_ingeridos",
-                etapa=f"Lendo CSV consolidado do grupo {grupo}",
-                caminho=str(caminho_grupo.parent),
-                arquivo=caminho_grupo.name,
-                processados=grupos_processados,
+                etapa="Arquivos CSV por grupo gerados com sucesso",
+                caminho=str(pasta_saida),
+                arquivo=f"{len(grupos_gerados)} grupo(s)",
+                processados=len(grupos_gerados),
                 total=len(grupos_gerados),
-                icone="📥",
+                icone="💾",
             )
 
-        if not dfs_finais:
-            return None
-        return pl.concat(dfs_finais, how="diagonal_relaxed")
+            imprimir_chamados_leitura_polars(caminhos_mesclas_geradas)
+            if not retornar_df_unificado:
+                return None
+
+            imprimir_log(
+                fase="saída",
+                funcao="mesclar_arquivos_ingeridos",
+                etapa="Montando df_unificado a partir dos CSVs por grupo",
+                caminho=str(pasta_saida),
+                arquivo="df_unificado",
+                processados=0,
+                total=len(grupos_gerados),
+                icone="📚",
+            )
+
+            dfs_finais: list[pl.DataFrame] = []
+            grupos_processados: int = 0
+            for grupo in sorted(grupos_gerados):
+                caminho_grupo: Path = pasta_saida / f"mescla_{normalizar_nome_arquivo_saida(grupo)}.csv"
+                if not caminho_grupo.exists():
+                    continue
+
+                df_grupo: pl.DataFrame = pl.read_csv(caminho_grupo)
+                dfs_finais.append(df_grupo)
+                grupos_processados += 1
+                imprimir_log(
+                    fase="saída",
+                    funcao="mesclar_arquivos_ingeridos",
+                    etapa=f"Lendo CSV consolidado do grupo {grupo}",
+                    caminho=str(caminho_grupo.parent),
+                    arquivo=caminho_grupo.name,
+                    processados=grupos_processados,
+                    total=len(grupos_gerados),
+                    icone="📥",
+                )
+
+            if not dfs_finais:
+                return None
+            return pl.concat(dfs_finais, how="diagonal_relaxed")
 
     imprimir_log(
         fase="inicialização",
