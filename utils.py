@@ -1825,3 +1825,4 @@ def mesclar_arquivos_do_manifesto(
         "caminhos_mesclas": caminhos_mesclas,
         "df_unificado": df_unificado,
     }
+    
