@@ -378,7 +378,7 @@ FileNotFoundError
         total: Optional[int] = None,
         icone: str = "ℹ️",
     ) -> None:
-        print("\\n" + "═" * 108)
+        print("\n" + "═" * 108)
         print(f"{icone} FASE : {fase}")
         print(f"🔧 FUNÇÃO : {funcao}")
         print(f"🧭 ETAPA : {etapa}")
@@ -1260,7 +1260,7 @@ FileNotFoundError
 
     def imprimir_chamados_leitura_parquet(caminhos_arquivos: dict[str, Path]) -> None:
         manifesto_df = ler_manifesto()
-        print("\\n" + "═" * 108)
+        print("\n" + "═" * 108)
         print("📌 COMANDOS PRONTOS PARA LEITURA DOS ARQUIVOS PARQUET NO POLARS")
         print("Cole os comandos abaixo no notebook:")
         print("import polars as pl")
